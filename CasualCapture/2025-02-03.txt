@@ -1,0 +1,3 @@
+
+13:59:49
+These notes should be saved locally around the same spot as the main.py and all that stuff, inside the venv.
