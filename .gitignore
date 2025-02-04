@@ -1,3 +1,6 @@
+# Default note and image storage directory created by the program -- Don't need these as part of the repo
+CasualCapture/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
