@@ -4,6 +4,7 @@
 from pathlib import Path
 from datetime import datetime
 from tkinter.filedialog import askopenfilename, asksaveasfilename, askdirectory
+import os
 
 
 class FileManager:
@@ -11,15 +12,16 @@ class FileManager:
         # Set the filepath and create the directories if needed
         self.filepath = Path.cwd() / filepath
         self.filepath.mkdir(parents=True, exist_ok=True)
+        os.chmod(self.filepath, 0o775)  # Update permissions on Linux for Read/Write access for all users
         self.filename = ""
 
-    def set_filepath(self, filepath):
-        '''Update current absolute filepath'''
-        self.filepath = Path(filepath).resolve()
+    def set_filename(self, filename):
+        '''update the current filename'''
+        self.filename = filename
 
-    def get_filepath(self):
-        '''Returns the full filepath for the current file saved in the object properties'''
-        return self.filepath
+        # If the file doesn't exist already then create it and update permissions.
+        self.append_file(data="")
+        self.update_file_permissions()
 
     def get_fullpath(self):
         '''Returns fullpath from filepath and filename'''
@@ -33,17 +35,13 @@ class FileManager:
         '''Generate a timestamp, e.g. 21:23:08'''
         return datetime.now().time().strftime("%H:%M:%S")
 
-    def set_filename(self, filename):
-        '''update the current filename'''
-        self.filename = filename
-
-    def create_file(self, filepath):
-        '''Check if a file exists. If it doesn't then create it'''
-        new_file = Path(filepath).resolve()
-        if not new_file.exists():
-            new_file.write_text("")
-
     def append_file(self, data):
         '''Add to the end of the file'''
         with open(self.filepath / self.filename, "a") as f:
             f.write(data)
+
+    def update_file_permissions(self):
+        '''update file permissions on Linux so file can be opened by
+           other users. Keyboard module has to be used as root so this
+           is the workaround...'''
+        os.chmod(self.get_fullpath(), 0o666)

@@ -52,7 +52,6 @@ class App(Tk):
         # Open/Create the file for today
         self.fm_notes.set_filename(self.fm_notes.generate_daily_filename())
 
-
         # Text widget and scrollbar setup
         self.notes_frame = Frame(self)
         self.notes_input = NotesInput(self.notes_frame)
@@ -140,8 +139,18 @@ class NotesInput(Text):
                 # Store a reference to the image to avoid it being garbage collected
                 self.image_list.append(tk_image)
 
+                # Insert a Markdown style reference to the image into the Text widget
+                # similar to how Obsidian behaves
+                self.tag_config("hidden", elide=True)
+                self.insert("insert", f"![[{self.fm_images.get_fullpath()}]]")
+                self.tag_add("hidden", "insert linestart", "insert lineend")
+
                 # Insert the image into Text widget
                 self.image_create("insert", image=tk_image)
+
+                # Update the image permissions on Linux so they can be accessed and 
+                # viewed in Markdown programs
+                #self.fm_images.update_file_permissions()
 
                 # Prevent default Ctrl-v behaviour
                 return "break"
