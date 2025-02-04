@@ -2,12 +2,16 @@
 # Also handles choosing a directory and the creation of blank files.
 
 from pathlib import Path
+from datetime import datetime
 from tkinter.filedialog import askopenfilename, asksaveasfilename, askdirectory
 
 
 class FileManager:
     def __init__(self, filepath):
-        self.filepath = Path.cwd() / filepath   # Full filepath and filename
+        # Set the filepath and create the directories if needed
+        self.filepath = Path.cwd() / filepath
+        self.filepath.mkdir(parents=True, exist_ok=True)
+        self.filename = ""
 
     def set_filepath(self, filepath):
         '''Update current absolute filepath'''
@@ -17,42 +21,29 @@ class FileManager:
         '''Returns the full filepath for the current file saved in the object properties'''
         return self.filepath
 
+    def get_fullpath(self):
+        '''Returns fullpath from filepath and filename'''
+        return self.filepath / self.filename
+
+    def generate_daily_filename(self):
+        '''generate filename for daily note file'''
+        return datetime.now().date().strftime("%Y-%m-%d") + ".txt"
+
+    def generate_timestamp(self):
+        '''Generate a timestamp, e.g. 21:23:08'''
+        return datetime.now().time().strftime("%H:%M:%S")
+
+    def set_filename(self, filename):
+        '''update the current filename'''
+        self.filename = filename
+
     def create_file(self, filepath):
         '''Check if a file exists. If it doesn't then create it'''
         new_file = Path(filepath).resolve()
         if not new_file.exists():
             new_file.write_text("")
 
-    def open(self, filepath=""):
-        '''Open a file and return it's contents'''
-        # Check filepath exists and use Open File Dialog if needed
-        if filepath == "" or not os.path.exists(filepath):
-            filepath = askopenfilename()
-
-        # Check if the filepath is valid and open the file
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                file_contents = f.read()
-
-            self.set_filepath(filepath)
-            return file_contents
-        
-    def save(self, file_content, filepath="", save_dialog=False):
-        '''Save file, ask for save location if not specified'''
-        if save_dialog or filepath == "" or not os.path.exists(filepath):
-            filepath = self.save_as()
-
-        if filepath != "":
-            with open(filepath, "w") as f:
-                f.write(file_content)
-
-            self.set_filepath(filepath)
-
-    def save_as(self):
-        '''Open SaveAs dialog and get user to choose a filepath'''
-        filepath = asksaveasfilename()
-        return filepath
-
-    def select_directory(self):
-        return askdirectory()
-        
+    def append_file(self, data):
+        '''Add to the end of the file'''
+        with open(self.filepath / self.filename, "a") as f:
+            f.write(data)

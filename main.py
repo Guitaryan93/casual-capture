@@ -46,26 +46,12 @@ class App(Tk):
         self.geometry("500x400")
         keyboard.add_hotkey("ctrl+alt+n", self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
 
-        # Set the default directory and filename for saving the files. Make the directories if necessary
-        self.files_dir = Path.cwd() / "CasualCapture"
-        self.files_dir.mkdir(parents=True, exist_ok=True)
-        self.image_dir = self.files_dir / "assets"
-        self.image_dir.mkdir(parents=True, exist_ok=True)
-
+        # Set the default directory and filename for saving note files. Make the directories if necessary
+        self.fm_notes = FileManager("CasualCapture")
+        
         # Open/Create the file for today
-        self.todays_file = datetime.now().date().strftime("%Y-%m-%d") + ".txt"
-        self.current_filepath = self.files_dir / self.todays_file
-        if not self.current_filepath.exists():
-            self.current_filepath.write_text("")
+        self.fm_notes.set_filename(self.fm_notes.generate_daily_filename())
 
-        # Setup timestamp preferences
-        self.timestamp = ""
-        self.add_timestamps = True
-        self.timestamp_interval = 10
-
-        # File Manager class handles creating, opening and saving of files
-        self.fm = FileManager()
-        self.fm.create_file(self.current_filepath)
 
         # Text widget and scrollbar setup
         self.notes_frame = Frame(self)
@@ -97,47 +83,13 @@ class App(Tk):
 
     def append_file(self):
         '''Open the day's file, append the Text widget data, then save the file'''
-        new_text = ""
-        todays_file = self.fm.open(self.current_filepath)
+        text_data = f"\n{self.fm_notes.generate_timestamp()}\n{self.notes_input.get_text_content()}" 
 
-        # Check to see if timestamp is needed
-        #if self.add_timestamps and self.compare_timestamps() > self.timestamp_interval:
-        #    new_text = self.generate_timestamp + "\n"
-
-        # Add this for TESTING ONLY **************
-        new_text = "\n" + self.generate_timestamp() + "\n"
-        
-        new_text += self.notes_input.get_text_content()
-
-        # As long as the text is not blank or just a timestamp we will append it
-        if new_text != "\n" and new_text != "" and new_text != self.timestamp + "\n":
-            todays_file += new_text
-            self.fm.save(todays_file, self.current_filepath, save_dialog=False)
+        self.fm_notes.append_file(text_data)
 
         # Clear the Text widget contents ready for the next note
         self.notes_input.clear()
         
-    def generate_timestamp(self):
-        '''Generate a timestamp, e.g. 21:23:08'''
-        self.timestamp = datetime.now().time().strftime("%H:%M:%S")
-        return self.timestamp
-
-    def compare_timestamps(self):
-        '''Compare how much time has passed between now and the previously
-           saved self.timestamp. Used to decide when to add a timestamp
-           to the daily file (to avoid spamming with timestamps)'''
-        time1_str = datetime.now().time().strftime("%H:%M:%S")
-        if self.timestamp != "":
-            time2_str = self.timestamp
-        else:
-            time2_str = time1_str
-        
-        time1 = datetime.strptime(time1_str, "%H:%M:%S").time()
-        time2 = datetime.strptime(time2_str, "%H:%M:%S").time()
-
-        # Need to subtract time2 from time1 to get difference, but this
-        # needs more research into HOW in Python...
-    
 
 class NotesInput(Text):
     '''Text widget child class -- This ONLY handles things related to the
@@ -147,11 +99,7 @@ class NotesInput(Text):
         self.parent = parent
         self.wrap = "word"
         self.hr_string = "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n"
-
-        # Use this to store pasted images in.
-        # There's probably a better way to separate this and the image
-        # saving process into a different class, but this will do for now...
-        self.img_dir = "C:\\Users\\ryanw\\Documents\\Python_Scripts\\casual_capture\\casual_capture_notes\\assets"
+        self.fm_images = FileManager("CasualCapture/assets")
 
         # Store references to the image objects here to avoid them being
         # garbage collected by mistake...
@@ -180,14 +128,13 @@ class NotesInput(Text):
             try:
                 # Save the image to default location
                 image_filename = datetime.now().time().strftime("%H%M%S") + ".png"
-                image_fullpath = os.path.join(self.img_dir, image_filename)
-                image.save(image_fullpath, "PNG")
+                self.fm_images.set_filename(image_filename)
+                image.save(self.fm_images.get_fullpath(), "PNG")
 
                 # Open image with PIL
-                pil_image = Image.open(image_fullpath)
+                pil_image = Image.open(self.fm_images.get_fullpath())
 
                 # Convert to Tkinter compatible image
-                #tk_image = ImageTk.PhotoImage(pil_image.convert("RGB"))  # Convert to "RGB" i.e. GIF format
                 tk_image = ImageTk.PhotoImage(pil_image)
 
                 # Store a reference to the image to avoid it being garbage collected
