@@ -29,7 +29,7 @@ class FileManager:
 
     def generate_daily_filename(self):
         '''generate filename for daily note file'''
-        return datetime.now().date().strftime("%Y-%m-%d") + ".md"
+        return datetime.now().date().strftime("%Y-%m-%d") + ".txt"
 
     def generate_timestamp(self):
         '''Generate a timestamp, e.g. 21:23:08'''
