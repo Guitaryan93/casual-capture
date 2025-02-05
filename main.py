@@ -1,9 +1,6 @@
 # Python GUI that can be called upon at any time in order to save ideas, links, any text really
 # to a file saved in a vault. Each day a new file is made and the user then has a living journal
 # following them around when they need it.
-#
-# Organization can be done with tags on paragraphs that are sorted into topic files saved under
-# the same name as the tags.
 
 # MUST INCLUDE A SETTINGS SCREEN!!!
 # Or at least a settings/config file in JSON or YAML or something...
@@ -12,6 +9,7 @@
 # - light and dark mode (of course)
 # - choice of 2 or 3 fonts
 # - font size
+# - Choose character for horizontal rules
 # - Set window size
 # - Set window popup location - top left | top right | bottom left | bottom right | center | at mouse cursor
 # - Choose whether timestamps should be added or not
@@ -20,17 +18,9 @@
 
 from tkinter import *
 from tkinter import ttk
-from tkinter.font import Font
-from tkinter import messagebox
-from tkinter import PhotoImage
 from file_manager import FileManager
+from note_input import NotesInput
 import keyboard
-from datetime import datetime
-from pathlib import Path
-
-from PIL import Image, ImageTk
-from PIL.ImageGrab import grabclipboard
-import pyperclip
 
 
 class App(Tk):
