@@ -28,6 +28,7 @@
 
 from tkinter import *
 from tkinter import ttk
+from tkinter.font import Font
 from tkinter import messagebox
 from tkinter import PhotoImage
 from file_manager import FileManager
@@ -43,7 +44,8 @@ import pyperclip
 class App(Tk):
     def __init__(self):
         super().__init__()
-        self.geometry("500x400")
+        #self.geometry("500x400")
+        self.attributes("-topmost", True)
         keyboard.add_hotkey("ctrl+alt+n", self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
 
         # Set the default directory and filename for saving note files. Make the directories if necessary
@@ -77,7 +79,8 @@ class App(Tk):
             self.append_file()
         else:
             self.deiconify()
-            self.notes_input.focus()
+            self.focus()              # Focus program window first to grab focus from current program
+            self.notes_input.focus()  # Move focus to the Text widget now that this program is in focus
 
 
     def append_file(self):
@@ -94,9 +97,20 @@ class NotesInput(Text):
     '''Text widget child class -- This ONLY handles things related to the
        text input and Text widget data'''
     def __init__(self, parent):
-        super().__init__()
+        super().__init__(parent)
         self.parent = parent
-        self.wrap = "word"
+
+        # Set font
+        font = Font(family="courier", size=11)
+        tab_size = font.measure("    ")
+
+        # Set configurations for Text widget
+        self.config(font=font)
+        self.config(wrap="word")
+        self.config(padx=5, pady=5)
+        self.config(undo=True)
+        self.config(tabs=(tab_size,))
+
         self.hr_string = "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n"
         self.fm_images = FileManager("CasualCapture/assets")
 
@@ -107,6 +121,9 @@ class NotesInput(Text):
         # Hotkeys
         keyboard.add_hotkey("ctrl+alt+-", self.insert_hr)
         self.bind("<Control-v>", self.handle_paste)
+        self.bind("<Shift-Insert>", self.handle_paste)
+        self.bind("<Control-BackSpace>", self.delete_word_backward)
+        self.bind("<Control-Delete>", self.delete_word_forward)
 
     def get_text_content(self):
         '''Return all text from inside the Text widget'''
@@ -117,6 +134,13 @@ class NotesInput(Text):
 
     def insert_hr(self):
         self.insert("insert", self.hr_string)
+
+    def delete_word_backward(self, event):
+        ''' *** THIS NEEDS WORK *** '''
+        self.delete("insert wordstart", "insert")
+
+    def delete_word_forward(self, event):
+        self.delete("insert", "insert wordend")
 
     def handle_paste(self, event):
         '''Handle paste manually so we can account for images being
@@ -142,15 +166,12 @@ class NotesInput(Text):
                 # Insert a Markdown style reference to the image into the Text widget
                 # similar to how Obsidian behaves
                 self.tag_config("hidden", elide=True)
-                self.insert("insert", f"![[{self.fm_images.get_fullpath()}]]")
+                self.insert("insert", f"![{self.fm_images.filename}]({self.fm_images.get_fullpath()})")
                 self.tag_add("hidden", "insert linestart", "insert lineend")
 
                 # Insert the image into Text widget
                 self.image_create("insert", image=tk_image)
-
-                # Update the image permissions on Linux so they can be accessed and 
-                # viewed in Markdown programs
-                #self.fm_images.update_file_permissions()
+                self.insert("insert", "\n")  # Add a newline to place cursor under the image
 
                 # Prevent default Ctrl-v behaviour
                 return "break"
