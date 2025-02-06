@@ -1,52 +1,52 @@
-# Python GUI that can be called upon at any time in order to save ideas, links, images (maybe), 
+# Python GUI that can be called upon at any time in order to save ideas, links, any text really
 # to a file saved in a vault. Each day a new file is made and the user then has a living journal
 # following them around when they need it.
-#
-# Organization can be done with tags on paragraphs that are sorted into topic files saved under
-# the same name as the tags.
 
-# MUST INCLUDE A SETTINGS SCREEN!!!
-# Or at least a settings/config file in JSON or YAML or something...
-#
-# Settings:
-# - Set directory where notes are saved -- NOPE. We are now going for a portable executable, so save to relative directory instead.
-# - Set format of the saved daily notes, e.g. YYYY-MM-DD.txt -- Maybe...
-# - Choose whether timestamps should be added or not
-# - Decide how long between timestamps, e.g. 5 mins, 10 mins, etc...
-#   to stop from spamming them in the daily files
-# - Choose whether to auto add horizontal rule before each new file write
-# - Choose which hotkey to bind the program to
-
-# WE CAN ADD IMAGES TO OUR TEXT WIDGET?!?!?!?!?!?!?!??!!?!?!
-# Now we need to add a little reference in the file to show where
-# the image should be added when the file is opened for viewing.
-# Could we make this a markdown style image reference so it is
-# compatible with markdown files? Like ![[path/to/image/here.png]]
-# Then the init of the Text widget, or the loading from the FileManager
-# will look for these and use them to pull the images into the Text
-# widget or something?!?!? This is AWESOME!!!!!!
+# Program Icon By -- Freepik
+# https://www.flaticon.com/free-icons/concert
 
 from tkinter import *
-from tkinter import ttk
-from tkinter.font import Font
-from tkinter import messagebox
-from tkinter import PhotoImage
 from file_manager import FileManager
+from note_input import NotesInput
+from settings_objects import Settings, SettingsWindow
 import keyboard
-from datetime import datetime
 from pathlib import Path
-
-from PIL import Image, ImageTk
-from PIL.ImageGrab import grabclipboard
-import pyperclip
 
 
 class App(Tk):
     def __init__(self):
         super().__init__()
-        #self.geometry("500x400")
+        # Load the program settings
+        self.settings = Settings("settings.json")
+
+        # JANKY CODE ALERT!!!!
+        if self.settings.app_position.lower() == "center":
+            x_pos = (self.winfo_screenwidth() / 2) - (self.settings.win_width / 2)
+            y_pos = (self.winfo_screenheight() / 2) - (self.settings.win_height / 2)
+        else:
+            screen_pos = self.settings.app_position.split(" ")
+            x_offset = 30
+            y_offset = 50
+            if screen_pos[0].lower() == "bottom":
+                y_pos = self.winfo_screenheight() - (self.settings.win_height + y_offset)
+            else:
+                y_pos = 0
+
+            if screen_pos[1].lower() == "right":
+                x_pos = self.winfo_screenwidth() - (self.settings.win_width + x_offset)
+            else:
+                x_pos = 0
+
+        self.geometry(f"{self.settings.win_width}x{self.settings.win_height}+{int(x_pos)}+{int(y_pos)}")
         self.attributes("-topmost", True)
-        keyboard.add_hotkey("ctrl+alt+n", self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
+        self.title("Casual Capture")
+
+        icon = PhotoImage(file="casual-capture-icon.png")
+        self.iconphoto(True, icon)
+        
+        self.whole_feed = False  # Show whole file in Text widget
+
+        keyboard.add_hotkey(self.settings.hotkey, self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
 
         # Set the default directory and filename for saving note files. Make the directories if necessary
         self.fm_notes = FileManager("CasualCapture")
@@ -54,19 +54,39 @@ class App(Tk):
         # Open/Create the file for today
         self.fm_notes.set_filename(self.fm_notes.generate_daily_filename())
 
-        # Text widget and scrollbar setup
+        # Create Text widget and frame
         self.notes_frame = Frame(self)
         self.notes_input = NotesInput(self.notes_frame)
-        self.notes_scrollbar = ttk.Scrollbar(self.notes_frame, orient="vertical", command=self.notes_input.yview)
-        self.notes_input["yscrollcommand"] = self.notes_scrollbar.set
+        self.notes_input.toggle_dark_mode(self.settings.dark_mode)
+        self.notes_input.set_font(self.settings.font_choice, self.settings.font_size)
+        wrap_setting = "word" if self.settings.word_wrap else "none"
+        self.notes_input.config(wrap=wrap_setting)
+
+        self.btn_frame = Frame(self.notes_frame)
+        # Match the frame background to the Text Widget background to hide it
+        if self.settings.dark_mode:
+            self.btn_frame.config(bg="#111111")
+        else:
+            self.btn_frame.config(bg="white")
+
+        # Current file data button -- lives inside Text widget with Settings button
+        self.feed_btn = Button(self.btn_frame, text="📰", cursor="hand2", command=self.insert_feed)
+        self.feed_btn.configure(width=2, height=1, padx=0, pady=0, font=("Arial", 8), relief="flat", bd=0)
+
+        # Settings Button widget -- This lives inside the Text widget, bottom right corner
+        self.settings_btn = Button(self.btn_frame, text="⚙", cursor="hand2", command=self.show_settings)
+        self.settings_btn.configure(width=2, height=1, padx=0, pady=0, font=("Arial", 8), relief="flat", bd=0)
 
         # Geometry management
-        self.notes_input.grid(column=0, row=0, sticky="nesw")
-        self.notes_scrollbar.grid(column=1, row=0, sticky="nesw")
-        self.grid_columnconfigure(0, weight = 1)
-        self.grid_rowconfigure(0, weight = 1)
-        
-        self.notes_frame.grid(column=0, row=0, sticky="nesw")
+        self.notes_frame.pack(fill="both", expand=True)
+        self.notes_input.pack(fill="both", expand=True)
+
+        # Pack the buttons into a frame and place the frame absolutely in the Text widget.
+        self.btn_frame.place(in_=self.notes_input, relx=1.0, rely=1.0, anchor="se")
+        #self.feed_btn.pack(fill="both", expand=True)
+        #self.settings_btn.pack(fill="both", expand=True)
+        self.feed_btn.pack(pady=5)
+        self.settings_btn.pack()
 
         self.notes_input.focus()
         
@@ -82,106 +102,35 @@ class App(Tk):
             self.focus()              # Focus program window first to grab focus from current program
             self.notes_input.focus()  # Move focus to the Text widget now that this program is in focus
 
+    def insert_feed(self):
+        '''insert the current file data into the Text widget'''
+        if self.whole_feed == False:
+            file_data = self.fm_notes.load_file()
+            self.notes_input.insert("1.0", file_data)
+            self.whole_feed = True
+        else:
+            self.append_file()
+            self.whole_feed = False
 
     def append_file(self):
         '''Open the day's file, append the Text widget data, then save the file'''
-        text_data = f"\n{self.fm_notes.generate_timestamp()}\n{self.notes_input.get_text_content()}" 
+        text_data = ""
+        if self.settings.insert_timestamps and not self.whole_feed:
+            text_data = f"{self.fm_notes.generate_timestamp()}"
+            if self.settings.add_horizontal_rule:
+                text_data += " " + (self.settings.hr_char * 60)
+            text_data += "\n"
+        
+        text_data += f"{self.notes_input.get_text_content()}\n" 
 
-        self.fm_notes.append_file(text_data)
+        self.fm_notes.append_file(text_data, self.whole_feed)
 
         # Clear the Text widget contents ready for the next note
         self.notes_input.clear()
-        
 
-class NotesInput(Text):
-    '''Text widget child class -- This ONLY handles things related to the
-       text input and Text widget data'''
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.parent = parent
-
-        # Set font
-        font = Font(family="courier", size=11)
-        tab_size = font.measure("    ")
-
-        # Set configurations for Text widget
-        self.config(font=font)
-        self.config(wrap="word")
-        self.config(padx=5, pady=5)
-        self.config(undo=True)
-        self.config(tabs=(tab_size,))
-
-        self.hr_string = "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n"
-        self.fm_images = FileManager("CasualCapture/assets")
-
-        # Store references to the image objects here to avoid them being
-        # garbage collected by mistake...
-        self.image_list = []
-        
-        # Hotkeys
-        keyboard.add_hotkey("ctrl+alt+-", self.insert_hr)
-        self.bind("<Control-v>", self.handle_paste)
-        self.bind("<Shift-Insert>", self.handle_paste)
-        self.bind("<Control-BackSpace>", self.delete_word_backward)
-        self.bind("<Control-Delete>", self.delete_word_forward)
-
-    def get_text_content(self):
-        '''Return all text from inside the Text widget'''
-        return self.get("1.0", "end")
-
-    def clear(self):
-        self.delete("1.0", "end")
-
-    def insert_hr(self):
-        self.insert("insert", self.hr_string)
-
-    def delete_word_backward(self, event):
-        ''' *** THIS NEEDS WORK *** '''
-        self.delete("insert wordstart", "insert")
-
-    def delete_word_forward(self, event):
-        self.delete("insert", "insert wordend")
-
-    def handle_paste(self, event):
-        '''Handle paste manually so we can account for images being
-           pasted into the Text widget'''
-        image = grabclipboard()
-
-        if image:
-            try:
-                # Save the image to default location
-                image_filename = datetime.now().time().strftime("%H%M%S") + ".png"
-                self.fm_images.set_filename(image_filename)
-                image.save(self.fm_images.get_fullpath(), "PNG")
-
-                # Open image with PIL
-                pil_image = Image.open(self.fm_images.get_fullpath())
-
-                # Convert to Tkinter compatible image
-                tk_image = ImageTk.PhotoImage(pil_image)
-
-                # Store a reference to the image to avoid it being garbage collected
-                self.image_list.append(tk_image)
-
-                # Insert a Markdown style reference to the image into the Text widget
-                # similar to how Obsidian behaves
-                self.tag_config("hidden", elide=True)
-                self.insert("insert", f"![{self.fm_images.filename}]({self.fm_images.get_fullpath()})")
-                self.tag_add("hidden", "insert linestart", "insert lineend")
-
-                # Insert the image into Text widget
-                self.image_create("insert", image=tk_image)
-                self.insert("insert", "\n")  # Add a newline to place cursor under the image
-
-                # Prevent default Ctrl-v behaviour
-                return "break"
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to handle image: {e}")
-        else:
-            # If no image is available then try pasting text into the widget
-            self.insert("insert", pyperclip.paste())
-
-        return "break"
+    def show_settings(self):
+        '''Show the settings toplevel UI'''
+        SettingsWindow(self, self.settings)
 
 
 if __name__ == "__main__":
