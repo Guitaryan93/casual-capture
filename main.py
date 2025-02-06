@@ -21,12 +21,33 @@ from tkinter import ttk, font
 from file_manager import FileManager
 from note_input import NotesInput
 import keyboard
+import json
+from pathlib import Path
 
 
 class App(Tk):
     def __init__(self):
         super().__init__()
-        #self.geometry("500x400")
+        # Load the program settings
+        self.settings = Settings("settings.json")
+
+        # JANKY CODE ALERT!!!!
+        if self.settings.app_position.lower() == "center":
+            x_pos = (self.winfo_screenwidth() / 2) - (self.settings.win_width / 2)
+            y_pos = (self.winfo_screenheight() / 2) - (self.settings.win_height / 2)
+        else:
+            screen_pos = self.settings.app_position.split(" ")
+            if screen_pos[0].lower() == "bottom":
+                y_pos = self.winfo_screenheight() - self.settings.win_height
+            else:
+                y_pos = 0
+
+            if screen_pos[1].lower() == "right":
+                x_pos = self.winfo_screenwidth() - self.settings.win_width
+            else:
+                x_pos = 0
+
+        self.geometry(f"{self.settings.win_width}x{self.settings.win_height}+{int(x_pos)}+{int(y_pos)}")
         self.attributes("-topmost", True)
         keyboard.add_hotkey("ctrl+alt+n", self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
 
@@ -39,6 +60,7 @@ class App(Tk):
         # Create Text widget and frame
         self.notes_frame = Frame(self)
         self.notes_input = NotesInput(self.notes_frame)
+        self.notes_input.toggle_dark_mode(self.settings.dark_mode)
 
         # Settings Button widget -- This lives inside the Text widget, bottom right corner
         self.settings_btn = Button(self.notes_frame, text="⚙", cursor="hand2", command=self.show_settings)
@@ -66,7 +88,13 @@ class App(Tk):
 
     def append_file(self):
         '''Open the day's file, append the Text widget data, then save the file'''
-        text_data = f"{self.fm_notes.generate_timestamp()}\n{self.notes_input.get_text_content()}\n" 
+        if self.settings.insert_timestamps:
+            text_data = f"{self.fm_notes.generate_timestamp()}"
+            if self.settings.add_horizontal_rule:
+                text_data += " " + (self.settings.hr_char * 60)
+            text_data += "\n"
+        
+        text_data += f"{self.notes_input.get_text_content()}\n" 
 
         self.fm_notes.append_file(text_data)
 
@@ -75,43 +103,101 @@ class App(Tk):
 
     def show_settings(self):
         '''Show the settings toplevel UI'''
-        SettingsWindow(self)
+        SettingsWindow(self, self.settings)
+
+
+class Settings:
+    '''Settings object that loads data from the settings.json file.
+       - This object is created by the main app on startup 
+       - It is refreshed when the settings.json file is updated from 
+         saving the SettingsWindow changes
+       - It is also passed to the SettingsWindow to set the defaults for
+         that objects GUI.'''
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.settings = self.load_settings()
+
+    def assign_settings(self):
+        '''set the properties of the object based on the settings data'''
+        self.dark_mode = self.settings["dark_mode"]
+        self.insert_timestamps = self.settings["insert_timestamps"]
+        self.add_horizontal_rule = self.settings["add_horizontal_rule"]
+        self.app_position = self.settings["app_position"]
+        self.win_width = self.settings["win_width"]
+        self.win_height = self.settings["win_height"]
+        self.font = self.settings["font"]
+        self.font_size = self.settings["font_size"]
+        self.hr_char = self.settings["hr_char"]
+
+    def update_settings(self):
+        '''build Python dict from settings to save as JSON'''
+        self.settings = {"dark_mode": self.dark_mode,
+                         "insert_timestamps": self.insert_timestamps,
+                         "add_horizontal_rule": self.add_horizontal_rule,
+                         "app_position": self.app_position,
+                         "win_width": self.win_width,
+                         "win_height": self.win_height,
+                         "font": self.font,
+                         "font_size": self.font_size,
+                         "hr_char": self.hr_char
+                         }
+
+    def load_settings(self):
+        '''load data from settings.json'''
+        with open(self.filepath, "r") as f:
+            self.settings = json.load(f)
+        self.assign_settings()
+
+    def save_settings(self):
+        '''save data to settings.json'''
+        with open(self.filepath, "w") as f:
+            json.dump(self.settings, f)
 
 
 class SettingsWindow(Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, data):
         super().__init__(parent)
         self.title("Settings")
         self.geometry("300x400")
         self.resizable(False, False)
+        self.attributes("-topmost", True)
+        self.focus()
+        
+        # Settings object data stored here
+        self.data = data
 
         # Setting initial options
-        self.dark_mode = BooleanVar(value=False)
-        self.insert_timestamps = BooleanVar(value=False)
-        self.add_horizontal_rule = BooleanVar(value=False)
-        self.app_position = StringVar(value="center")
-        self.width = IntVar(value=400)
-        self.height = IntVar(value=300)
-        self.font_choice = StringVar(value="Arial")
-        self.font_size = IntVar(value=12)
-        self.hr_char = StringVar(value="-")
+        self.dark_mode = BooleanVar(value=self.data.dark_mode)
+        self.insert_timestamps = BooleanVar(value=self.data.insert_timestamps)
+        self.add_horizontal_rule = BooleanVar(value=self.data.add_horizontal_rule)
+        self.app_position = StringVar(value=self.data.app_position)
+        self.win_width = IntVar(value=self.data.win_width)
+        self.win_height = IntVar(value=self.data.win_height)
+        self.font_choice = StringVar(value=self.data.font)
+        self.font_size = IntVar(value=self.data.font_size)
+        self.hr_char = StringVar(value=self.data.hr_char)
 
+        # Dark/Light mode toggle
         ttk.Checkbutton(self, text="Dark Mode", variable=self.dark_mode).pack(anchor="w", padx=10, pady=5)
 
+        # Timestamp options
         ttk.Checkbutton(self, text="Insert Timestamps", variable=self.insert_timestamps).pack(anchor="w", padx=10, pady=5)
         ttk.Checkbutton(self, text="Add Horizontal Rule", variable=self.add_horizontal_rule).pack(anchor="w", padx=10, pady=5)
 
-        ttk.Label(self, text="App Position:").pack(anchor="w", padx=10, pady=5)
+        # Window popup position
+        ttk.Label(self, text="Window Position:").pack(anchor="w", padx=10, pady=5)
         positions = ["top left", "top right", "bottom left", "bottom right", "center", "at mouse pointer"]
         position_menu = ttk.OptionMenu(self, self.app_position, positions[4], *positions)
         position_menu.pack(anchor="w", padx=10)
 
+        # Window dimensions
         ttk.Label(self, text="Window Width:").pack(anchor="w", padx=10)
-        ttk.Entry(self, textvariable=self.width).pack(anchor="w", padx=10)
+        ttk.Entry(self, textvariable=self.win_width).pack(anchor="w", padx=10)
 
         ttk.Label(self, text="Window Height:").pack(anchor="w", padx=10)
-        ttk.Entry(self, textvariable=self.height).pack(anchor="w", padx=10)
+        ttk.Entry(self, textvariable=self.win_height).pack(anchor="w", padx=10)
 
+        # Font choice
         ttk.Label(self, text="Font Choice:").pack(anchor="w", padx=10)
         available_fonts = list(font.families())
         font_menu = ttk.Combobox(self, textvariable=self.font_choice, values=available_fonts)
@@ -136,15 +222,19 @@ class SettingsWindow(Toplevel):
         cancel_button.grid(row=0, column=1, padx=5)
 
     def save_settings(self):
-        """Prints the settings and destroys the window."""
-        print("Settings Saved:")
-        print(f"Dark Mode: {self.dark_mode.get()}")
-        print(f"Insert Timestamps: {self.insert_timestamps.get()}")
-        print(f"Add Horizontal Rule: {self.add_horizontal_rule.get()}")
-        print(f"App Position: {self.app_position.get()}")
-        print(f"Window Size: {self.width.get()}x{self.height.get()}")
-        print(f"Font: {self.font_choice.get()} {self.font_size.get()}")
-        print(f"Horizontal Rule Character: {self.hr_char.get()}")
+        '''Updates the settings and destroys the window.'''
+        self.data.dark_mode = self.dark_mode.get()
+        self.data.insert_timestamps = self.insert_timestamps.get()
+        self.data.add_horizontal_rule = self.add_horizontal_rule.get()
+        self.data.app_position = self.app_position.get()
+        self.data.win_width = self.win_width.get()
+        self.data.win_height = self.win_height.get()
+        self.data.font_choice = self.font_choice.get()
+        self.data.font_size = self.font_size.get()
+        self.data.hr_char = self.hr_char.get()
+        self.data.update_settings()
+        self.data.save_settings()
+        self.data.load_settings()
         self.destroy()
         
 

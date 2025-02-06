@@ -45,3 +45,9 @@ class NotesInput(Text):
     def delete_word_forward(self, event):
         self.delete("insert", "insert wordend")
 
+    def toggle_dark_mode(self, dark_mode):
+        if dark_mode:
+            self.config(bg="black", fg="white")
+        else:
+            self.config(bg="white", fg="black")
+
