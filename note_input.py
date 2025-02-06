@@ -15,8 +15,7 @@ class NotesInput(Text):
 
         # Set configurations for Text widget
         self.config(font=font)
-        self.config(wrap="word")
-        self.config(padx=5, pady=5)
+        self.config(padx=7, pady=5)
         self.config(undo=True)
         self.config(tabs=(tab_size,))
 
@@ -47,7 +46,9 @@ class NotesInput(Text):
 
     def toggle_dark_mode(self, dark_mode):
         if dark_mode:
-            self.config(bg="black", fg="white")
+            self.config(bg="#111111", fg="white", insertbackground="white")
         else:
-            self.config(bg="white", fg="black")
+            self.config(bg="white", fg="black", insertbackground="black")
 
+    def set_font(self, font_choice, font_size):
+        self.config(font=(font_choice, font_size))

@@ -2,26 +2,14 @@
 # to a file saved in a vault. Each day a new file is made and the user then has a living journal
 # following them around when they need it.
 
-# MUST INCLUDE A SETTINGS SCREEN!!!
-# Or at least a settings/config file in JSON or YAML or something...
-#
-# Settings:
-# - light and dark mode (of course)
-# - choice of 2 or 3 fonts
-# - font size
-# - Choose character for horizontal rules
-# - Set window size
-# - Set window popup location - top left | top right | bottom left | bottom right | center | at mouse cursor
-# - Choose whether timestamps should be added or not
-# - Choose whether to auto add horizontal rule before each new file write
-# - Choose which hotkey to bind the program to
+# Program Icon By -- Freepik
+# https://www.flaticon.com/free-icons/concert
 
 from tkinter import *
-from tkinter import ttk, font
 from file_manager import FileManager
 from note_input import NotesInput
+from settings_objects import Settings, SettingsWindow
 import keyboard
-import json
 from pathlib import Path
 
 
@@ -37,19 +25,28 @@ class App(Tk):
             y_pos = (self.winfo_screenheight() / 2) - (self.settings.win_height / 2)
         else:
             screen_pos = self.settings.app_position.split(" ")
+            x_offset = 30
+            y_offset = 50
             if screen_pos[0].lower() == "bottom":
-                y_pos = self.winfo_screenheight() - self.settings.win_height
+                y_pos = self.winfo_screenheight() - (self.settings.win_height + y_offset)
             else:
                 y_pos = 0
 
             if screen_pos[1].lower() == "right":
-                x_pos = self.winfo_screenwidth() - self.settings.win_width
+                x_pos = self.winfo_screenwidth() - (self.settings.win_width + x_offset)
             else:
                 x_pos = 0
 
         self.geometry(f"{self.settings.win_width}x{self.settings.win_height}+{int(x_pos)}+{int(y_pos)}")
         self.attributes("-topmost", True)
-        keyboard.add_hotkey("ctrl+alt+n", self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
+        self.title("Casual Capture")
+
+        icon = PhotoImage(file="casual-capture-icon.png")
+        self.iconphoto(True, icon)
+        
+        self.whole_feed = False  # Show whole file in Text widget
+
+        keyboard.add_hotkey(self.settings.hotkey, self.show_hide_window)  # Set up a global hotkey to unwithdraw the window
 
         # Set the default directory and filename for saving note files. Make the directories if necessary
         self.fm_notes = FileManager("CasualCapture")
@@ -61,15 +58,35 @@ class App(Tk):
         self.notes_frame = Frame(self)
         self.notes_input = NotesInput(self.notes_frame)
         self.notes_input.toggle_dark_mode(self.settings.dark_mode)
+        self.notes_input.set_font(self.settings.font_choice, self.settings.font_size)
+        wrap_setting = "word" if self.settings.word_wrap else "none"
+        self.notes_input.config(wrap=wrap_setting)
+
+        self.btn_frame = Frame(self.notes_frame)
+        # Match the frame background to the Text Widget background to hide it
+        if self.settings.dark_mode:
+            self.btn_frame.config(bg="#111111")
+        else:
+            self.btn_frame.config(bg="white")
+
+        # Current file data button -- lives inside Text widget with Settings button
+        self.feed_btn = Button(self.btn_frame, text="📰", cursor="hand2", command=self.insert_feed)
+        self.feed_btn.configure(width=2, height=1, padx=0, pady=0, font=("Arial", 8), relief="flat", bd=0)
 
         # Settings Button widget -- This lives inside the Text widget, bottom right corner
-        self.settings_btn = Button(self.notes_frame, text="⚙", cursor="hand2", command=self.show_settings)
+        self.settings_btn = Button(self.btn_frame, text="⚙", cursor="hand2", command=self.show_settings)
         self.settings_btn.configure(width=2, height=1, padx=0, pady=0, font=("Arial", 8), relief="flat", bd=0)
 
         # Geometry management
         self.notes_frame.pack(fill="both", expand=True)
         self.notes_input.pack(fill="both", expand=True)
-        self.settings_btn.place(in_=self.notes_input, relx=1.0, rely=1.0, anchor="se")
+
+        # Pack the buttons into a frame and place the frame absolutely in the Text widget.
+        self.btn_frame.place(in_=self.notes_input, relx=1.0, rely=1.0, anchor="se")
+        #self.feed_btn.pack(fill="both", expand=True)
+        #self.settings_btn.pack(fill="both", expand=True)
+        self.feed_btn.pack(pady=5)
+        self.settings_btn.pack()
 
         self.notes_input.focus()
         
@@ -85,10 +102,20 @@ class App(Tk):
             self.focus()              # Focus program window first to grab focus from current program
             self.notes_input.focus()  # Move focus to the Text widget now that this program is in focus
 
+    def insert_feed(self):
+        '''insert the current file data into the Text widget'''
+        if self.whole_feed == False:
+            file_data = self.fm_notes.load_file()
+            self.notes_input.insert("1.0", file_data)
+            self.whole_feed = True
+        else:
+            self.append_file()
+            self.whole_feed = False
 
     def append_file(self):
         '''Open the day's file, append the Text widget data, then save the file'''
-        if self.settings.insert_timestamps:
+        text_data = ""
+        if self.settings.insert_timestamps and not self.whole_feed:
             text_data = f"{self.fm_notes.generate_timestamp()}"
             if self.settings.add_horizontal_rule:
                 text_data += " " + (self.settings.hr_char * 60)
@@ -96,7 +123,7 @@ class App(Tk):
         
         text_data += f"{self.notes_input.get_text_content()}\n" 
 
-        self.fm_notes.append_file(text_data)
+        self.fm_notes.append_file(text_data, self.whole_feed)
 
         # Clear the Text widget contents ready for the next note
         self.notes_input.clear()
@@ -104,139 +131,6 @@ class App(Tk):
     def show_settings(self):
         '''Show the settings toplevel UI'''
         SettingsWindow(self, self.settings)
-
-
-class Settings:
-    '''Settings object that loads data from the settings.json file.
-       - This object is created by the main app on startup 
-       - It is refreshed when the settings.json file is updated from 
-         saving the SettingsWindow changes
-       - It is also passed to the SettingsWindow to set the defaults for
-         that objects GUI.'''
-    def __init__(self, filepath):
-        self.filepath = filepath
-        self.settings = self.load_settings()
-
-    def assign_settings(self):
-        '''set the properties of the object based on the settings data'''
-        self.dark_mode = self.settings["dark_mode"]
-        self.insert_timestamps = self.settings["insert_timestamps"]
-        self.add_horizontal_rule = self.settings["add_horizontal_rule"]
-        self.app_position = self.settings["app_position"]
-        self.win_width = self.settings["win_width"]
-        self.win_height = self.settings["win_height"]
-        self.font = self.settings["font"]
-        self.font_size = self.settings["font_size"]
-        self.hr_char = self.settings["hr_char"]
-
-    def update_settings(self):
-        '''build Python dict from settings to save as JSON'''
-        self.settings = {"dark_mode": self.dark_mode,
-                         "insert_timestamps": self.insert_timestamps,
-                         "add_horizontal_rule": self.add_horizontal_rule,
-                         "app_position": self.app_position,
-                         "win_width": self.win_width,
-                         "win_height": self.win_height,
-                         "font": self.font,
-                         "font_size": self.font_size,
-                         "hr_char": self.hr_char
-                         }
-
-    def load_settings(self):
-        '''load data from settings.json'''
-        with open(self.filepath, "r") as f:
-            self.settings = json.load(f)
-        self.assign_settings()
-
-    def save_settings(self):
-        '''save data to settings.json'''
-        with open(self.filepath, "w") as f:
-            json.dump(self.settings, f)
-
-
-class SettingsWindow(Toplevel):
-    def __init__(self, parent, data):
-        super().__init__(parent)
-        self.title("Settings")
-        self.geometry("300x400")
-        self.resizable(False, False)
-        self.attributes("-topmost", True)
-        self.focus()
-        
-        # Settings object data stored here
-        self.data = data
-
-        # Setting initial options
-        self.dark_mode = BooleanVar(value=self.data.dark_mode)
-        self.insert_timestamps = BooleanVar(value=self.data.insert_timestamps)
-        self.add_horizontal_rule = BooleanVar(value=self.data.add_horizontal_rule)
-        self.app_position = StringVar(value=self.data.app_position)
-        self.win_width = IntVar(value=self.data.win_width)
-        self.win_height = IntVar(value=self.data.win_height)
-        self.font_choice = StringVar(value=self.data.font)
-        self.font_size = IntVar(value=self.data.font_size)
-        self.hr_char = StringVar(value=self.data.hr_char)
-
-        # Dark/Light mode toggle
-        ttk.Checkbutton(self, text="Dark Mode", variable=self.dark_mode).pack(anchor="w", padx=10, pady=5)
-
-        # Timestamp options
-        ttk.Checkbutton(self, text="Insert Timestamps", variable=self.insert_timestamps).pack(anchor="w", padx=10, pady=5)
-        ttk.Checkbutton(self, text="Add Horizontal Rule", variable=self.add_horizontal_rule).pack(anchor="w", padx=10, pady=5)
-
-        # Window popup position
-        ttk.Label(self, text="Window Position:").pack(anchor="w", padx=10, pady=5)
-        positions = ["top left", "top right", "bottom left", "bottom right", "center", "at mouse pointer"]
-        position_menu = ttk.OptionMenu(self, self.app_position, positions[4], *positions)
-        position_menu.pack(anchor="w", padx=10)
-
-        # Window dimensions
-        ttk.Label(self, text="Window Width:").pack(anchor="w", padx=10)
-        ttk.Entry(self, textvariable=self.win_width).pack(anchor="w", padx=10)
-
-        ttk.Label(self, text="Window Height:").pack(anchor="w", padx=10)
-        ttk.Entry(self, textvariable=self.win_height).pack(anchor="w", padx=10)
-
-        # Font choice
-        ttk.Label(self, text="Font Choice:").pack(anchor="w", padx=10)
-        available_fonts = list(font.families())
-        font_menu = ttk.Combobox(self, textvariable=self.font_choice, values=available_fonts)
-        font_menu.pack(anchor="w", padx=10)
-
-        # Font size input
-        ttk.Label(self, text="Font Size:").pack(anchor="w", padx=10)
-        ttk.Entry(self, textvariable=self.font_size).pack(anchor="w", padx=10)
-
-        # Single character input for Horizontal Rule
-        ttk.Label(self, text="Horizontal Rule Character:").pack(anchor="w", padx=10)
-        hr_char_entry = ttk.Entry(self, textvariable=self.hr_char, width=3)
-        hr_char_entry.pack(anchor="w", padx=10)
-
-        # Save and Cancel buttons
-        button_frame = ttk.Frame(self)
-        button_frame.pack(pady=10)
-        
-        save_button = ttk.Button(button_frame, text="Save", command=self.save_settings)
-        save_button.grid(row=0, column=0, padx=5)
-        cancel_button = ttk.Button(button_frame, text="Cancel", command=self.destroy)
-        cancel_button.grid(row=0, column=1, padx=5)
-
-    def save_settings(self):
-        '''Updates the settings and destroys the window.'''
-        self.data.dark_mode = self.dark_mode.get()
-        self.data.insert_timestamps = self.insert_timestamps.get()
-        self.data.add_horizontal_rule = self.add_horizontal_rule.get()
-        self.data.app_position = self.app_position.get()
-        self.data.win_width = self.win_width.get()
-        self.data.win_height = self.win_height.get()
-        self.data.font_choice = self.font_choice.get()
-        self.data.font_size = self.font_size.get()
-        self.data.hr_char = self.hr_char.get()
-        self.data.update_settings()
-        self.data.save_settings()
-        self.data.load_settings()
-        self.destroy()
-        
 
 
 if __name__ == "__main__":

@@ -4,3 +4,6 @@ Built using Python and the Tkinter library to keep it lightweight and cross-plat
 # Setting Up
 To setup the project you just need to clone this repository to your local machine, create your Python virtual environment, install the requirements from `requirements.txt`, and run the main.py file.
 At some point there will be executables created for each OS and a script to launch the correct executable for the OS in use (thinking from a portable version standpoint). But for now it has to be built locally until the development is a bit more complete.
+
+Program icon by Freepik.
+<a href="https://www.flaticon.com/free-icons/concert" title="concert icons">Concert icons created by Freepik - Flaticon</a>

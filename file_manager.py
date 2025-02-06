@@ -19,7 +19,7 @@ class FileManager:
         self.filename = filename
 
         # If the file doesn't exist already then create it and update permissions.
-        self.append_file(data="")
+        self.append_file(data="", overwrite=False)
         self.update_file_permissions()
 
     def get_fullpath(self):
@@ -34,10 +34,17 @@ class FileManager:
         '''Generate a timestamp, e.g. 21:23:08'''
         return datetime.now().time().strftime("%H:%M:%S")
 
-    def append_file(self, data):
+    def append_file(self, data, overwrite):
         '''Add to the end of the file'''
-        with open(self.filepath / self.filename, "a") as f:
+        file_access = "w" if overwrite else "a"
+        with open(self.filepath / self.filename, file_access, encoding='utf-8') as f:
             f.write(data)
+
+    def load_file(self):
+        '''return the current file contents'''
+        with open(self.get_fullpath(), "r", encoding="utf-8") as f:
+            file_data = f.read()
+        return file_data
 
     def update_file_permissions(self):
         '''update file permissions on Linux so file can be opened by
