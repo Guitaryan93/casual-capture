@@ -12,6 +12,7 @@ class FileManager:
         self.filepath = Path.cwd() / filepath
         self.filepath.mkdir(parents=True, exist_ok=True)
         os.chmod(self.filepath, 0o775)  # Update permissions on Linux for Read/Write access for all users
+                                        # SECURITY ISSUE!!! Need to find a way to secure this...
         self.filename = ""
 
     def set_filename(self, filename):
@@ -49,5 +50,6 @@ class FileManager:
     def update_file_permissions(self):
         '''update file permissions on Linux so file can be opened by
            other users. Keyboard module has to be used as root so this
-           is the workaround...'''
+           is the workaround... Potential SECURITY RISK THOUGH!!! What if a
+           filename for a higher permissions file is passed???'''
         os.chmod(self.get_fullpath(), 0o666)

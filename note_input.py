@@ -9,7 +9,7 @@ class NotesInput(Text):
         super().__init__(parent)
         self.parent = parent
 
-        # Set font
+        # Set default font
         font = Font(family="courier", size=11)
         tab_size = font.measure("    ")
 
@@ -22,7 +22,6 @@ class NotesInput(Text):
         self.hr_string = ("-" * 80) + "\n"
 
         # Hotkeys
-        #keyboard.add_hotkey("ctrl+alt+-", self.insert_hr)
         self.bind("<Control-Alt-minus>", self.insert_hr)
         self.bind("<Control-BackSpace>", self.delete_word_backward)
         self.bind("<Control-Delete>", self.delete_word_forward)
@@ -38,13 +37,15 @@ class NotesInput(Text):
         self.insert("insert", self.hr_string)
 
     def delete_word_backward(self, event):
-        ''' *** THIS NEEDS WORK *** '''
+        ''' *** THIS NEEDS WORK -- Not quite working as expected... *** '''
         self.delete("insert wordstart", "insert")
 
     def delete_word_forward(self, event):
         self.delete("insert", "insert wordend")
 
     def toggle_dark_mode(self, dark_mode):
+        '''update background, foreground, and insert cursor colours to give
+           simple dark/light modes'''
         if dark_mode:
             self.config(bg="#111111", fg="white", insertbackground="white")
         else:
